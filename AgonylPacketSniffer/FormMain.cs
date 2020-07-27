@@ -80,6 +80,21 @@ namespace AgonylPacketSniffer
                 Width = 100,
             });
             this.packetProcessBgWorker.RunWorkerAsync();
+            var inputFile = Utils.GetFirstInputFileName();
+            if (inputFile != string.Empty)
+            {
+                try
+                {
+                    foreach (var packet in JsonConvert.DeserializeObject<BindingList<A3PacketInfo>>(File.ReadAllText(inputFile)))
+                    {
+                        this._boundA3Packets.Add(packet);
+                    }
+                }
+                catch
+                {
+                    Utils.ShowHexView(inputFile);
+                }
+            }
         }
 
         private void startButton_Click(object sender, EventArgs e)
@@ -97,6 +112,7 @@ namespace AgonylPacketSniffer
                 }
                 else
                 {
+                    this.Text = "Agonyl Packet Sniffer - Capturing";
                     this._packetQueue.Clear();
                     this._a3Packets.Clear();
                     this._boundA3Packets.Clear();
@@ -198,12 +214,13 @@ namespace AgonylPacketSniffer
             }
 
             File.WriteAllText(
-                    this.GetCurrentSessionDirectory() + Path.DirectorySeparatorChar + "session.json",
+                    this.GetCurrentSessionDirectory() + Path.DirectorySeparatorChar + "session.apsp",
                     JsonConvert.SerializeObject(this._a3Packets, Formatting.Indented));
             this.dataGridView.RefreshEdit();
             this.dataGridView.Refresh();
             this.stopButton.Enabled = false;
             this.startButton.Enabled = true;
+            this.Text = "Agonyl Packet Sniffer - Stopped";
         }
 
         private void packetProcessBgWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -233,7 +250,7 @@ namespace AgonylPacketSniffer
                         this._crypt.Decrypt(ref data);
                     }
 
-                    fileName += hexProtocol + ".bin";
+                    fileName += hexProtocol + ".a3p";
                     var packetInfo = new A3PacketInfo
                     {
                         Name = prefix + "_UNKNOWN_PACKET",
@@ -255,6 +272,64 @@ namespace AgonylPacketSniffer
         private void packetProcessBgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
             this._boundA3Packets.Add(this._a3Packets.Last());
+        }
+
+        private void dataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            var dataIndexNo = this.dataGridView.Rows[e.RowIndex].Index;
+            if (File.Exists(this._boundA3Packets[dataIndexNo].DataFile))
+            {
+                Utils.ShowHexView(this._boundA3Packets[dataIndexNo].DataFile);
+            }
+            else
+            {
+                _ = MessageBox.Show("Packet file not found!", "Agonyl Packet Sniffer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void dataGridView_DragEnter(object sender, DragEventArgs e)
+        {
+            if (!this._running)
+            {
+                // Check if the Data format of the file(s) can be accepted
+                // (we only accept file drops from Windows Explorer, etc.)
+                if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                {
+                    // modify the drag drop effects to Move
+                    e.Effect = DragDropEffects.All;
+                }
+                else
+                {
+                    // no need for any drag drop effect
+                    e.Effect = DragDropEffects.None;
+                }
+            }
+        }
+
+        private void dataGridView_DragDrop(object sender, DragEventArgs e)
+        {
+            if (!this._running)
+            {
+                // still check if the associated data from the file(s) can be used for this purpose
+                if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                {
+                    // Fetch the file(s) names with full path here to be processed
+                    var fileList = (string[])e.Data.GetData(DataFormats.FileDrop);
+                    try
+                    {
+                        // Process the 1st file from the list
+                        this._boundA3Packets.Clear();
+                        foreach (var packet in JsonConvert.DeserializeObject<BindingList<A3PacketInfo>>(File.ReadAllText(fileList[0])))
+                        {
+                            this._boundA3Packets.Add(packet);
+                        }
+                    }
+                    catch
+                    {
+                        Utils.ShowHexView(fileList[0]);
+                    }
+                }
+            }
         }
 
         private string GetCurrentSessionDirectory()

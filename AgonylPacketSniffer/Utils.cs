@@ -82,5 +82,28 @@ namespace AgonylPacketSniffer
         {
             return BitConverter.ToUInt16(packet.Skip(10).Take(2).ToArray(), 0);
         }
+
+        public static string GetFirstInputFileName()
+        {
+            var args = Environment.GetCommandLineArgs();
+            var inputFile = string.Empty;
+            for (var i = 0; i <= args.Length - 1; i++)
+            {
+                if (!args[i].EndsWith(".exe"))
+                {
+                    inputFile = args[i];
+                    break;
+                }
+            }
+
+            return inputFile;
+        }
+
+        public static void ShowHexView(string fileName)
+        {
+            var hexView = new FormHexView();
+            hexView.DataFile = fileName;
+            hexView.Show();
+        }
     }
 }
