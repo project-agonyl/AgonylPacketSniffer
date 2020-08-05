@@ -11,15 +11,17 @@ namespace AgonylPacketSniffer
 {
     public partial class FormMain : Form
     {
-        private const ushort LOGIN_AGENT_PORT = 3550;
         private bool _running;
         private Queue<A3Packet> _packetQueue = new Queue<A3Packet>();
         private PacketCommunicator _communicator;
         private string _sessionName = string.Empty;
         private Crypt _crypt = new Crypt();
-        private List<A3PacketInfo> _a3Packets = new List<A3PacketInfo>();
+        private Queue<A3PacketInfo> _a3Packets = new Queue<A3PacketInfo>();
         private BindingList<A3PacketInfo> _boundA3Packets = new BindingList<A3PacketInfo>();
         private uint _packetsCaptured;
+        private ushort[] _packetCapturePorts;
+        private ushort[] _loginPorts;
+        private ushort[] _zonePorts;
 
         private delegate void UpdatePacketsCapturedTextDelegate(string text);
 
@@ -35,6 +37,10 @@ namespace AgonylPacketSniffer
                 _ = MessageBox.Show("Config.json not found!", "Agonyl Packet Sniffer", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
             }
+
+            this._packetCapturePorts = Utils.GetPacketCapturePorts();
+            this._loginPorts = Utils.GetLoginPorts();
+            this._zonePorts = Utils.GetZonePorts();
 
             foreach (var device in LivePacketDevice.AllLocalMachine)
             {
@@ -145,7 +151,6 @@ namespace AgonylPacketSniffer
         private void packetCaptureBgWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             var worker = sender as BackgroundWorker;
-            var packetCapturePorts = Utils.GetPacketCapturePorts();
             while (this._running)
             {
                 if (worker.CancellationPending)
@@ -174,7 +179,7 @@ namespace AgonylPacketSniffer
                 }
 
                 var isIncoming = false;
-                if (packetCapturePorts.Contains(tcp.SourcePort))
+                if (this._packetCapturePorts.Contains(tcp.SourcePort))
                 {
                     isIncoming = true;
                 }
@@ -233,12 +238,10 @@ namespace AgonylPacketSniffer
                     var a3packet = this._packetQueue.Dequeue();
                     var ipAddress = a3packet.IsIncoming ? a3packet.Packet.Ethernet.IpV4.Source : a3packet.Packet.Ethernet.IpV4.Destination;
                     var fileName = a3packet.Timestamp.ToString() + "_";
-                    var prefix = a3packet.IsIncoming ? "S2C" : "C2S";
-                    fileName += prefix + "_";
                     var data = a3packet.Tcp.Payload.ToArray();
                     var protocol = Utils.GetPacketProtocol(ref data);
                     var hexProtocol = $"0x{protocol:X}";
-                    if (a3packet.Port == LOGIN_AGENT_PORT)
+                    if (this._loginPorts.Contains(a3packet.Port))
                     {
                         fileName += "LOGIN_";
                         protocol = Convert.ToUInt16(data.Length);
@@ -247,13 +250,17 @@ namespace AgonylPacketSniffer
                     else
                     {
                         fileName += "ZONE_";
-                        this._crypt.Decrypt(ref data);
+                        if (data.Length != 56)
+                        {
+                            this._crypt.Decrypt(ref data);
+                        }
                     }
 
-                    fileName += hexProtocol + ".a3p";
+                    var packetName = Utils.GetPacketProtocolName(ref data, a3packet.IsIncoming);
+                    fileName += packetName + ".a3p";
                     var packetInfo = new A3PacketInfo
                     {
-                        Name = prefix + "_UNKNOWN_PACKET",
+                        Name = packetName,
                         ServerPort = a3packet.Port,
                         Protocol = protocol,
                         DataLength = data.Length,
@@ -263,7 +270,7 @@ namespace AgonylPacketSniffer
                         ServerIPAddress = ipAddress.ToString(),
                     };
                     File.WriteAllBytes(packetInfo.DataFile, data);
-                    this._a3Packets.Add(packetInfo);
+                    this._a3Packets.Enqueue(packetInfo);
                     worker.ReportProgress(this._a3Packets.Count);
                 }
             }
@@ -271,7 +278,7 @@ namespace AgonylPacketSniffer
 
         private void packetProcessBgWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            this._boundA3Packets.Add(this._a3Packets.Last());
+            this._boundA3Packets.Add(this._a3Packets.Dequeue());
         }
 
         private void dataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)

@@ -2,7 +2,9 @@
 {
     public class Config
     {
-        public ushort[] Ports { get; set; }
+        public ushort[] Login { get; set; }
+
+        public ushort[] Zone { get; set; }
 
         public string[] Hosts { get; set; }
     }
