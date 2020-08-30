@@ -394,6 +394,7 @@ namespace AgonylPacketSniffer
                             break;
 
                         case 0x18:
+                        case 0x20:
                             opCode += "GIVE_ITEM";
                             break;
 
@@ -402,6 +403,7 @@ namespace AgonylPacketSniffer
                             break;
 
                         case 0x23:
+                        case 0x24:
                             opCode += "ASK_DEAL";
                             break;
 
@@ -410,10 +412,12 @@ namespace AgonylPacketSniffer
                             break;
 
                         case 0x27:
+                        case 0x28:
                             opCode += "PUTIN_ITEM";
                             break;
 
                         case 0x29:
+                        case 0x30:
                             opCode += "PUTOUT_ITEM";
                             break;
 

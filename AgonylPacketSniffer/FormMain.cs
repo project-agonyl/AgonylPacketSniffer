@@ -220,7 +220,7 @@ namespace AgonylPacketSniffer
 
             File.WriteAllText(
                     this.GetCurrentSessionDirectory() + Path.DirectorySeparatorChar + "session.apsp",
-                    JsonConvert.SerializeObject(this._a3Packets, Formatting.Indented));
+                    JsonConvert.SerializeObject(this._boundA3Packets, Formatting.Indented));
             this.dataGridView.RefreshEdit();
             this.dataGridView.Refresh();
             this.stopButton.Enabled = false;
